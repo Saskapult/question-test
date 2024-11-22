@@ -4,12 +4,14 @@ import sys
 import os
 from openai import OpenAI
 import pydantic
+import asyncio
+from websockets.asyncio.server import serve
 
 api_key = ""
 if len(sys.argv) > 1:
 	print("Using argument API key")
 	api_key = sys.argv[1]
-elif os.environ.contains("OPENAI_API_KEY"):
+elif os.environ.get("OPENAI_API_KEY") is not None:
 	print("Using environment API key")
 	api_key = os.environ.get("OPENAI_API_KEY")
 else:
@@ -25,7 +27,19 @@ class QueryResponse(pydantic.BaseModel):
 
 def main():
 	print("Hello world!")
-	prompt_loop()
+	asyncio.run(query_serve_loop())
+
+
+async def query_serve_loop():
+	async with serve(query_serve, "localhost", 3528) as server:
+		await asyncio.Future()
+
+
+async def query_serve(websocket):
+	async for message in websocket:
+		bf = beet_fact(message)
+		print(f"{message} -> {bf}")
+		await websocket.send(bf)
 
 
 def beet_fact(query):
@@ -56,19 +70,6 @@ Question:
 	)
 
 	return response.choices[0].message.content
-
-
-def prompt_loop():
-	cowsay("Hello! Do you like beets? I Love them! Please ask me questions about beets.")
-	while True:
-		query = input(">")
-		if query == "":
-			break
-		cowsay(beet_fact(query))
-
-
-def cowsay(text):
-	os.system(f'cowsay "{text}"')
 
 
 if __name__ == "__main__":

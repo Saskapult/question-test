@@ -4,23 +4,10 @@ import sys
 import os
 from openai import OpenAI
 import pydantic
+from websockets.sync.client import connect
 
-api_key = ""
-if len(sys.argv) > 1:
-	print("Using argument API key")
-	api_key = sys.argv[1]
-elif os.environ.contains("OPENAI_API_KEY"):
-	print("Using environment API key")
-	api_key = os.environ.get("OPENAI_API_KEY")
-else:
-	print("No API key supplied!")
-	exit(1)
-
-# 4o
-client = OpenAI(api_key=api_key)
-
-class QueryResponse(pydantic.BaseModel):
-	text: str
+server_address = "ws://localhost:3528"
+server_ws = None
 
 
 def main():
@@ -29,33 +16,16 @@ def main():
 
 
 def beet_fact(query):
-	f = open("beet_facts", "r")
-	lines = f.readlines()
-	f.close()
-
-	lines = [line for line in lines if not line.startswith("#")]
-	lines = [line.strip() for line in lines]
-	lines = [line for line in lines if line != ""]
-	data = "\n".join(lines)
-
-	response = client.beta.chat.completions.parse(
-		model="gpt-4o-mini",
-		messages=[
-			{"role": "system", "content": "Answer questions about beets."},
-			{"role": "user", "content": f"""
-Use the article below to answer the subsequent question. If the answer cannot be found, write "I don't know."
-
-Article:
-{data}
-
-Question:
-{query}
-			""".strip()},
-		],
-		response_format=QueryResponse,
-	)
-
-	return response.choices[0].message.content
+	global server_ws
+	if server_ws is None:
+		# print("Initialize connection to server...")
+		try:
+			server_ws = connect(server_address)
+		except Exception as e:
+			return f"{e}"		
+	server_ws.send(query)
+	response = server_ws.recv()
+	return response
 
 
 def prompt_loop():
@@ -65,10 +35,15 @@ def prompt_loop():
 		if query == "":
 			break
 		cowsay(beet_fact(query))
+	if not server_ws is None:
+		server_ws.close()
 
 
 def cowsay(text):
-	os.system(f'cowsay "{text}"')
+	text = text.replace("'", "")
+	text = text.replace('"', "")
+	if os.system(f'cowsay "{text}"') != 0:
+		print(text)
 
 
 if __name__ == "__main__":
