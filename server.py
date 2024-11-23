@@ -22,7 +22,6 @@ else:
 	print("No API key supplied!")
 	exit(1)
 
-# 4o
 client = OpenAI(api_key=api_key)
 rag = None
 
@@ -58,8 +57,6 @@ class BeetRAG:
 				pickle.dump(self.embeddings, f)
 
 		print("Done init!")
-
-		# super.__init__()
 	
 	def chunk_of(self, query):
 		embedding = client.embeddings.create(
